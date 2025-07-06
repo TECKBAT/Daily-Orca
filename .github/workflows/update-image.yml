@@ -2,34 +2,48 @@ name: Update Daily Orca
 
 on:
   schedule:
-    - cron: '0 0 * * *'  # every day at midnight UTC
+    - cron: '0 0 * * *'  # Every day at midnight UTC
   workflow_dispatch:
 
 jobs:
   update:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout Repo
         uses: actions/checkout@v3
+
+      - name: Install jq
+        run: sudo apt-get install jq
+
+      - name: Get Today’s Date
+        id: date
+        run: echo "today=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
       - name: Fetch Unsplash Image
         run: |
-          DATE=$(date +%Y-%m-%d)
+          DATE="${{ steps.date.outputs.today }}"
           SEED=$(date +%d)
           if [ $((SEED % 2)) -eq 0 ]; then
             QUERY="orca"
           else
             QUERY="killer whale"
           fi
+          echo "Using query: $QUERY"
+
           IMAGE_URL=$(curl -s "https://api.unsplash.com/photos/random?query=$QUERY&client_id=${{ secrets.UNSPLASH_KEY }}&sig=$DATE" | jq -r '.urls.full')
-          echo "{\"imageUrl\": \"$IMAGE_URL\"}" > daily-orca.json
+
+          if [ -z "$IMAGE_URL" ] || [ "$IMAGE_URL" = "null" ]; then
+            echo "Failed to fetch image"
+            echo '{"imageUrl": ""}' > daily-orca.json
+          else
+            echo "Fetched: $IMAGE_URL"
+            echo "{\"imageUrl\": \"$IMAGE_URL\"}" > daily-orca.json
+          fi
 
       - name: Commit and Push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add daily-orca.json
-          git commit -m "Update image for $DATE" || echo "No changes to commit"
-          git push
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: EndBug/add-and-commit@v9
+        with:
+          author_name: github-actions
+          author_email: github-actions@github.com
+          message: "Update image for ${{ steps.date.outputs.today }}"
