@@ -1,0 +1,33 @@
+name: Update Daily Orca
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # every day at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Fetch Unsplash Image
+        run: |
+          DATE=$(date +%Y-%m-%d)
+          SEED=$(date +%d)
+          if [ $((SEED % 2)) -eq 0 ]; then
+            QUERY="orca"
+          else
+            QUERY="killer whale"
+          fi
+          IMAGE_URL=$(curl -s "https://api.unsplash.com/photos/random?query=$QUERY&client_id=${{ secrets.UNSPLASH_KEY }}&sig=$DATE" | jq -r '.urls.full')
+          echo "{\"imageUrl\": \"$IMAGE_URL\"}" > daily-orca.json
+
+      - name: Commit and Push
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add daily-orca.json
+          git commit -m "Update image for $DATE"
+          git push
