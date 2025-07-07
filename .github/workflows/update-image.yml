@@ -22,7 +22,7 @@ jobs:
 
       - name: Fetch Unsplash Image
         run: |
-          set +e  # Don't exit on error — handle manually
+          set +e  # Don't exit on errors
 
           DATE="${{ steps.date.outputs.today }}"
           SEED=$(date +%d)
@@ -35,26 +35,31 @@ jobs:
           echo "Using query: $QUERY"
           echo "Date seed: $DATE"
 
-          RESPONSE=$(curl -s "https://api.unsplash.com/photos/random?query=$QUERY&client_id=$UNSPLASH_KEY&sig=$DATE")
+          RESPONSE=$(curl -s "https://api.unsplash.com/photos/random?query=$QUERY&count=10&client_id=$UNSPLASH_KEY&sig=$DATE")
 
-          # Optional: show full API response for debugging
-          echo "API response:"
-          echo "$RESPONSE"
+          echo "API response received"
 
-          # Print any Unsplash error messages
-          echo "$RESPONSE" | jq -r '.errors[]?'
+          echo "$RESPONSE" | jq -r '.errors[]?'  # show error messages if any
 
-          IMAGE_URL=$(echo "$RESPONSE" | jq -r '.urls.full')
+          # Try to find the first image with 'orca' or 'whale' in its alt_description
+          IMAGE_URL=$(echo "$RESPONSE" | jq -r '[.[] | select(.alt_description | test("orca|whale"; "i"))][0].urls.full')
 
+          # If no match found, fallback to the first image anyway
           if [ -z "$IMAGE_URL" ] || [ "$IMAGE_URL" = "null" ]; then
-            echo "Failed to fetch image"
+            echo "No relevant match found, falling back to first result"
+            IMAGE_URL=$(echo "$RESPONSE" | jq -r '.[0].urls.full')
+          fi
+
+          # Final check
+          if [ -z "$IMAGE_URL" ] || [ "$IMAGE_URL" = "null" ]; then
+            echo "Failed to fetch any valid image"
             echo '{"imageUrl": ""}' > daily-orca.json
           else
-            echo "Fetched: $IMAGE_URL"
+            echo "Fetched image: $IMAGE_URL"
             echo "{\"imageUrl\": \"$IMAGE_URL\"}" > daily-orca.json
           fi
 
-          exit 0  # Always succeed — don’t fail workflow on image issues
+          exit 0
         env:
           UNSPLASH_KEY: ${{ secrets.UNSPLASH_KEY }}
 
