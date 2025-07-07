@@ -20,26 +20,33 @@ jobs:
         id: date
         run: echo "today=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
-      - name: Fetch Unsplash Image
-        run: |
-          DATE="${{ steps.date.outputs.today }}"
-          SEED=$(date +%d)
-          if [ $((SEED % 2)) -eq 0 ]; then
-            QUERY="orca"
-          else
-            QUERY="killer whale"
-          fi
-          echo "Using query: $QUERY"
+- name: Fetch Unsplash Image (with debug)
+  run: |
+    DATE="${{ steps.date.outputs.today }}"
+    SEED=$(date +%d)
+    if [ $((SEED % 2)) -eq 0 ]; then
+      QUERY="orca"
+    else
+      QUERY="killer whale"
+    fi
 
-          IMAGE_URL=$(curl -s "https://api.unsplash.com/photos/random?query=$QUERY&client_id=${{ secrets.UNSPLASH_KEY }}&sig=$DATE" | jq -r '.urls.full')
+    echo "Using query: $QUERY"
+    echo "Date seed: $DATE"
 
-          if [ -z "$IMAGE_URL" ] || [ "$IMAGE_URL" = "null" ]; then
-            echo "Failed to fetch image"
-            echo '{"imageUrl": ""}' > daily-orca.json
-          else
-            echo "Fetched: $IMAGE_URL"
-            echo "{\"imageUrl\": \"$IMAGE_URL\"}" > daily-orca.json
-          fi
+    RESPONSE=$(curl -s "https://api.unsplash.com/photos/random?query=$QUERY&client_id=$UNSPLASH_KEY&sig=$DATE")
+    echo "API response: $RESPONSE"
+
+    IMAGE_URL=$(echo "$RESPONSE" | jq -r '.urls.full')
+
+    if [ -z "$IMAGE_URL" ] || [ "$IMAGE_URL" = "null" ]; then
+      echo "Failed to fetch image"
+      echo '{"imageUrl": ""}' > daily-orca.json
+    else
+      echo "Fetched: $IMAGE_URL"
+      echo "{\"imageUrl\": \"$IMAGE_URL\"}" > daily-orca.json
+    fi
+  env:
+    UNSPLASH_KEY: ${{ secrets.UNSPLASH_KEY }}
 
       - name: Commit and Push
         uses: EndBug/add-and-commit@v9
