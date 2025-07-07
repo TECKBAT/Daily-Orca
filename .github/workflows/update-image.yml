@@ -20,7 +20,7 @@ jobs:
         id: date
         run: echo "today=$(date +%Y-%m-%d)" >> $GITHUB_OUTPUT
 
-- name: Fetch Unsplash Image (with debug)
+- name: Fetch Unsplash Image
   run: |
     DATE="${{ steps.date.outputs.today }}"
     SEED=$(date +%d)
