@@ -22,14 +22,15 @@ jobs:
 
       - name: Fetch Unsplash Image
         run: |
-          set +e  # Don't exit on errors
+          set +e  # Allow errors without killing the workflow
 
           DATE="${{ steps.date.outputs.today }}"
           SEED=$(date +%d)
+
           if [ $((SEED % 2)) -eq 0 ]; then
             QUERY="orca"
           else
-            QUERY="killer%20whale"
+            QUERY="killer%20whale"  # URL-encoded
           fi
 
           echo "Using query: $QUERY"
@@ -39,18 +40,20 @@ jobs:
 
           echo "API response received"
 
-          echo "$RESPONSE" | jq -r '.errors[]?'  # show error messages if any
+          # Only show errors if the response is an object
+          IS_OBJECT=$(echo "$RESPONSE" | jq 'type == "object"')
+          if [ "$IS_OBJECT" = "true" ]; then
+            echo "$RESPONSE" | jq -r '.errors[]?'
+          fi
 
-          # Try to find the first image with 'orca' or 'whale' in its alt_description
+          # Try to find the best match (alt_description includes orca/whale)
           IMAGE_URL=$(echo "$RESPONSE" | jq -r '[.[] | select(.alt_description | test("orca|whale"; "i"))][0].urls.full')
 
-          # If no match found, fallback to the first image anyway
           if [ -z "$IMAGE_URL" ] || [ "$IMAGE_URL" = "null" ]; then
-            echo "No relevant match found, falling back to first result"
+            echo "No matching description found, falling back to first image"
             IMAGE_URL=$(echo "$RESPONSE" | jq -r '.[0].urls.full')
           fi
 
-          # Final check
           if [ -z "$IMAGE_URL" ] || [ "$IMAGE_URL" = "null" ]; then
             echo "Failed to fetch any valid image"
             echo '{"imageUrl": ""}' > daily-orca.json
